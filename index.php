@@ -162,7 +162,7 @@ foreach ($prs as $pr) {
 
     // Single GraphQL call for reviews, review requests, and comment threads
     $gql = sprintf(
-        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { mergeable author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved } } } } }',
+        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { mergeable author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved comments(last:1) { nodes { author { login } } } } } } } }',
         $repoOwner, $repoName, $number
     );
     $gqlResult = githubGraphql($gql, $githubToken);
@@ -215,9 +215,16 @@ foreach ($prs as $pr) {
     $threads = $prData['reviewThreads'] ?? ['totalCount' => 0, 'nodes' => []];
     $totalComments = $threads['totalCount'];
     $resolvedComments = 0;
+    $repliedComments = 0;
     foreach ($threads['nodes'] as $thread) {
         if (!empty($thread['isResolved'])) {
             $resolvedComments++;
+            $repliedComments++;
+        } else {
+            $lastAuthor = $thread['comments']['nodes'][0]['author']['login'] ?? '';
+            if ($lastAuthor === $prAuthor) {
+                $repliedComments++;
+            }
         }
     }
 
@@ -240,8 +247,10 @@ foreach ($prs as $pr) {
     // Jira comment stats
     $jiraCmts = jiraCommentStats($jiraKey, $jiraDomain, $jiraEmail, $jiraToken, $jiraMyAccountId);
 
-    // Highlight flag: 2 approvals + Jira status needs updating
-    $highlight = $approvalCount >= 2 && in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR CODING']);
+    // Highlight flag (any condition true => highlight)
+    $allReplied = ($totalComments === 0 || $repliedComments >= $totalComments);
+    $highlight = ($approvalCount >= 2 && in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR CODING']))
+              || ($allReplied && $totalComments > 0 && !in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR TEST']));
 
     $rows[] = [
         'number'            => $number,
@@ -258,8 +267,9 @@ foreach ($prs as $pr) {
         'approvals'         => $approvalCount,
         'total_reviewers'   => $totalReviewers,
         'pr_status'         => $prStatus,
-        'comments_resolved' => $resolvedComments,
-        'comments_total'    => $totalComments,
+        'comments_resolved'    => $resolvedComments,
+        'comments_total'       => $totalComments,
+        'comments_all_replied' => ($totalComments === 0 || $repliedComments >= $totalComments),
         'needs_rerequest'   => $needsRerequest,
         'has_conflict'      => $hasConflict,
         'highlight'         => $highlight,
@@ -409,46 +419,7 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PR &amp; Task Tracker</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 2rem; }
-        h1 { margin-bottom: 1.5rem; color: #58a6ff; font-size: 1.5rem; }
-        table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 8px; overflow: hidden; }
-        th { background: #21262d; color: #8b949e; text-align: left; padding: 12px 16px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { padding: 12px 16px; border-top: 1px solid #21262d; font-size: 0.9rem; }
-        tr:hover td { background: #1c2128; }
-        a { color: #58a6ff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-        .badge-merged { background: #8957e5; color: #fff; }
-        .badge-open { background: #238636; color: #fff; }
-        .badge-closed { background: #da3633; color: #fff; }
-        .badge-jira { background: #21262d; color: #8b949e; }
-        .badge-jira-warn { background: #6e2b2b; color: #f0a0a0; }
-        .approvals { font-weight: 600; }
-        .approvals-green { color: #238636; }
-        .approvals-red { color: #da3633; }
-        .meta { color: #8b949e; font-size: 0.85rem; margin-bottom: 1rem; }
-        .filters { margin-bottom: 1.2rem; display: flex; gap: 1.5rem; align-items: center; }
-        .filters label { display: flex; align-items: center; gap: 0.4rem; color: #8b949e; font-size: 0.9rem; cursor: pointer; }
-        .filters input[type="checkbox"] { accent-color: #58a6ff; width: 16px; height: 16px; cursor: pointer; }
-        tr.highlight td { background: #3d1518; }
-        tr.highlight:hover td { background: #4d1a1e; }
-        h2 { margin-top: 2.5rem; margin-bottom: 1rem; color: #58a6ff; font-size: 1.2rem; }
-        .ticket-rel { font-size: 0.75rem; color: #8b949e; }
-        .ticket-rel:hover { color: #58a6ff; }
-        .ticket-arrow { font-size: 0.9rem; color: #8b949e; }
-        .reviewer-approved { color: #238636; }
-        .reviewer-pending { color: #d29922; }
-        .reviewer-list { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; }
-        .days-old { font-weight: 600; }
-        .days-warn { color: #d29922; }
-        .days-urgent { color: #da3633; }
-        .comments-resolved { color: #238636; }
-        .comments-unresolved { color: #da3633; }
-        .rerequest-icon { color: #da3633; font-size: 0.85rem; margin-left: 0.3rem; cursor: help; }
-        .conflict-badge { display: inline-block; background: #da3633; color: #fff; font-size: 10px; font-family: Arial, sans-serif; font-weight: 700; width: 18px; height: 18px; line-height: 19px; text-align: center; border-radius: 50%; margin-left: 0.4rem; vertical-align: middle; cursor: help; letter-spacing: 0; padding-left: 1px; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1>PR &amp; Task Tracker</h1>
@@ -480,7 +451,7 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
                 <td><span class="badge <?= $jiraBadge ?>"><?= htmlspecialchars($row['jira_status']) ?></span></td>
                 <?php $jCmtClass = ($row['jira_cmts_total'] > $row['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
                 <td><span class="<?= $jCmtClass ?>"><?= $row['jira_cmts_replied'] ?>/<?= $row['jira_cmts_total'] ?></span></td>
-                <?php $cmtClass = ($row['comments_total'] > $row['comments_resolved']) ? 'comments-unresolved' : 'comments-resolved'; ?>
+                <?php $cmtClass = $row['comments_all_replied'] ? 'comments-resolved' : 'comments-unresolved'; ?>
                 <td><span class="<?= $cmtClass ?>"><?= $row['comments_resolved'] ?>/<?= $row['comments_total'] ?></span><?php if ($row['needs_rerequest']): ?><span class="rerequest-icon" title="Reviewer needs to be re-requested">&#8635;</span><?php endif; ?></td>
                 <td>
                     <span class="approvals <?= $row['approvals'] >= 2 ? 'approvals-green' : 'approvals-red' ?>"><?= $row['approvals'] ?>/<?= $row['total_reviewers'] ?></span>
