@@ -162,11 +162,14 @@ foreach ($prs as $pr) {
 
     // Single GraphQL call for reviews, review requests, and comment threads
     $gql = sprintf(
-        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved } } } } }',
+        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { mergeable author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved } } } } }',
         $repoOwner, $repoName, $number
     );
     $gqlResult = githubGraphql($gql, $githubToken);
     $prData = $gqlResult['data']['repository']['pullRequest'] ?? [];
+
+    // Check for merge conflicts
+    $hasConflict = ($prData['mergeable'] ?? '') === 'CONFLICTING';
 
     // Count approvals: track latest review state per user
     $prAuthor = $prData['author']['login'] ?? '';
@@ -258,6 +261,7 @@ foreach ($prs as $pr) {
         'comments_resolved' => $resolvedComments,
         'comments_total'    => $totalComments,
         'needs_rerequest'   => $needsRerequest,
+        'has_conflict'      => $hasConflict,
         'highlight'         => $highlight,
     ];
 }
@@ -443,6 +447,7 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
         .comments-resolved { color: #238636; }
         .comments-unresolved { color: #da3633; }
         .rerequest-icon { color: #da3633; font-size: 0.85rem; margin-left: 0.3rem; cursor: help; }
+        .conflict-badge { display: inline-block; background: #da3633; color: #fff; font-size: 10px; font-family: Arial, sans-serif; font-weight: 700; width: 18px; height: 18px; line-height: 19px; text-align: center; border-radius: 50%; margin-left: 0.4rem; vertical-align: middle; cursor: help; letter-spacing: 0; padding-left: 1px; }
     </style>
 </head>
 <body>
@@ -469,7 +474,7 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
             <?php foreach ($rows as $row): ?>
             <tr<?= $row['highlight'] ? ' class="highlight"' : '' ?>>
                 <td><a href="https://github.com/<?= htmlspecialchars($githubRepo) ?>/pull/<?= $row['number'] ?>" target="_blank">#<?= $row['number'] ?></a></td>
-                <td><?= htmlspecialchars($row['title']) ?></td>
+                <td><?= htmlspecialchars($row['title']) ?><?php if ($row['has_conflict']): ?><span class="conflict-badge" title="Conflict">C</span><?php endif; ?></td>
                 <td><?= renderTicketCell($row['jira_num'], $row['jira_key'], $row['jira_parent'], $row['jira_child'], $jiraDomain, $row['jira_parent_status'], $row['jira_child_status']) ?></td>
                 <?php $jiraBadge = strtoupper($row['jira_status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $jiraBadge ?>"><?= htmlspecialchars($row['jira_status']) ?></span></td>
