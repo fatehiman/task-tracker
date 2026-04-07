@@ -1,8 +1,8 @@
 <?php
 
 $githubToken = '';
-$githubRepo  = '';
-$githubUser  = '';
+$githubRepo  = '';    //e.g. transferfintech/ebankp
+$githubUser  = '';    //github username not email
 
 $jiraDomain = '';
 $jiraEmail  = '';
