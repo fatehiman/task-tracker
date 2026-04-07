@@ -324,14 +324,14 @@ do {
         // From reviews: track latest state per user
         foreach ($rvData['reviews']['nodes'] ?? [] as $rv) {
             $login = $rv['author']['login'] ?? '';
-            if ($login && $login !== $githubUser && $login !== $rvAuthor) {
+            if ($login && $login !== $githubUser && $login !== $rvAuthor && $login !== 'cubic-dev-ai') {
                 $otherReviewers[$login] = $rv['state'];
             }
         }
         // From pending requests
         foreach ($rvData['reviewRequests']['nodes'] ?? [] as $rr) {
             $login = $rr['requestedReviewer']['login'] ?? ($rr['requestedReviewer']['name'] ?? '');
-            if ($login && $login !== $githubUser && $login !== $rvAuthor && !isset($otherReviewers[$login])) {
+            if ($login && $login !== $githubUser && $login !== $rvAuthor && $login !== 'cubic-dev-ai' && !isset($otherReviewers[$login])) {
                 $otherReviewers[$login] = 'PENDING';
             }
         }
