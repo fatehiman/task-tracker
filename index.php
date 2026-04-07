@@ -266,6 +266,7 @@ foreach ($prs as $pr) {
         'jira_cmts_total'   => $jiraCmts['total'],
         'approvals'         => $approvalCount,
         'total_reviewers'   => $totalReviewers,
+        'reviewer_names'    => $allReviewers ? implode(', ', array_map(fn($login) => $login . ' (' . ($reviewerStates[$login] ?? 'PENDING') . ')', array_keys($allReviewers))) : '',
         'pr_status'         => $prStatus,
         'comments_resolved'    => $resolvedComments,
         'comments_total'       => $totalComments,
@@ -452,9 +453,9 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
                 <?php $jCmtClass = ($row['jira_cmts_total'] > $row['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
                 <td><span class="<?= $jCmtClass ?>"><?= $row['jira_cmts_replied'] ?>/<?= $row['jira_cmts_total'] ?></span></td>
                 <?php $cmtClass = $row['comments_all_replied'] ? 'comments-resolved' : 'comments-unresolved'; ?>
-                <td><span class="<?= $cmtClass ?>"><?= $row['comments_resolved'] ?>/<?= $row['comments_total'] ?></span><?php if ($row['needs_rerequest']): ?><span class="rerequest-icon" title="Reviewer needs to be re-requested">&#8635;</span><?php endif; ?></td>
+                <td><span class="<?= $cmtClass ?>"><?= $row['comments_resolved'] ?>/<?= $row['comments_total'] ?></span></td>
                 <td>
-                    <span class="approvals <?= $row['approvals'] >= 2 ? 'approvals-green' : 'approvals-red' ?>"><?= $row['approvals'] ?>/<?= $row['total_reviewers'] ?></span>
+                    <span class="approvals <?= $row['approvals'] >= 2 ? 'approvals-green' : 'approvals-red' ?>" title="<?= htmlspecialchars($row['reviewer_names']) ?>"><?= $row['approvals'] ?>/<?= $row['total_reviewers'] ?></span><?php if ($row['needs_rerequest']): ?><span class="rerequest-icon" title="Reviewer needs to be re-requested">&#8635;</span><?php endif; ?>
                 </td>
                 <td>
                     <?php
