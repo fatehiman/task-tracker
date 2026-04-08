@@ -163,7 +163,7 @@ foreach ($prs as $pr) {
 
     // Single GraphQL call for reviews, review requests, and comment threads
     $gql = sprintf(
-        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { mergeable author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved comments(last:1) { nodes { author { login } } } } } } } }',
+        '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { mergeable author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(last:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved comments(last:1) { nodes { author { login } } } } } } } }',
         $repoOwner, $repoName, $number
     );
     $gqlResult = githubGraphql($gql, $githubToken);
@@ -177,8 +177,9 @@ foreach ($prs as $pr) {
     $reviewerStates = [];
     foreach ($prData['reviews']['nodes'] ?? [] as $review) {
         $login = $review['author']['login'] ?? '';
-        if ($login) {
-            $reviewerStates[$login] = $review['state'];
+        $state = $review['state'] ?? '';
+        if ($login && in_array($state, ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'])) {
+            $reviewerStates[$login] = $state;
         }
     }
     $approvalCount = count(array_filter($reviewerStates, fn($s) => $s === 'APPROVED'));
@@ -311,7 +312,7 @@ do {
         $rvNum = $rvPr['number'];
         // Single GraphQL call for author, reviewers, review states, comments, and review request date
         $rvGql = sprintf(
-            '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(first:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved } } timelineItems(itemTypes: REVIEW_REQUESTED_EVENT, first: 50) { nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } } } } } } } }',
+            '{ repository(owner:"%s", name:"%s") { pullRequest(number:%d) { author { login } reviewRequests(first:50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } } reviews(last:100) { nodes { author { login } state } } reviewThreads(first:100) { totalCount nodes { isResolved } } timelineItems(itemTypes: REVIEW_REQUESTED_EVENT, first: 50) { nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } } } } } } } }',
             $repoOwner, $repoName, $rvNum
         );
         $rvGqlResult = githubGraphql($rvGql, $githubToken);

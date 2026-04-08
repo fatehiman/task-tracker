@@ -16,7 +16,7 @@ A table listing all your authored pull requests with:
 | **Jira Status** | Current Jira status badge; `WORKING ON` is highlighted with a warning background |
 | **Task cmnts** | Jira issue comments — replied/total (red if unreplied comments exist) |
 | **PR cmnts** | GitHub review thread comments — resolved/total; green if all threads are replied to (even if not formally resolved by the reviewer), red if unreplied threads remain |
-| **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise; hover to see each reviewer's name and state; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned |
+| **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise; hover to see each reviewer's name and state; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned. Only definitive review states (`APPROVED`, `CHANGES_REQUESTED`, `DISMISSED`) are tracked — intermediate `COMMENTED` reviews do not overwrite a prior approval |
 | **PR Status** | Merged (purple), Open (green), or Closed (red) badge |
 
 **Row highlighting:** Rows are highlighted in dark red when either condition is met:
@@ -59,7 +59,7 @@ Events can be filtered out via the `$zohoIgnoreEvents` CSV setting in `env.php` 
 
 - **PHP 8.x** with cURL
 - **GitHub REST API v3** — PR search, merge status
-- **GitHub GraphQL API** — mergeable state, reviews, review requests, review threads, timeline events
+- **GitHub GraphQL API** — mergeable state, reviews (fetches latest 100 to handle PRs with many review events), review requests, review threads, timeline events
 - **Jira REST API v3** — issue search (`POST /rest/api/3/search/jql`), issue details, comments, user identity
 - **Zoho Calendar API** — OAuth2 token refresh, calendar event listing (EU datacenter)
 
