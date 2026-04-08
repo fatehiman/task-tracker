@@ -15,13 +15,13 @@ A table listing all your authored pull requests with:
 | **Jira Ticket** | Extracted `ED-XXXX` number with parent/child ticket hierarchy (shown as arrows with tooltip statuses) |
 | **Jira Status** | Current Jira status badge; `WORKING ON` is highlighted with a warning background |
 | **Task cmnts** | Jira issue comments — replied/total (red if unreplied comments exist) |
-| **PR cmnts** | GitHub review thread comments — resolved/total; green if all threads are replied to (even if not formally resolved by the reviewer), red if unreplied threads remain; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned |
-| **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise |
+| **PR cmnts** | GitHub review thread comments — resolved/total; green if all threads are replied to (even if not formally resolved by the reviewer), red if unreplied threads remain |
+| **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise; hover to see each reviewer's name and state; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned |
 | **PR Status** | Merged (purple), Open (green), or Closed (red) badge |
 
 **Row highlighting:** Rows are highlighted in dark red when either condition is met:
 - **2+ approvals** and Jira status is still `READY FOR CODE REVIEW` or `READY FOR CODING` (Jira ticket needs updating)
-- **All PR comments replied** (at least one comment thread exists) and Jira status is not `READY FOR CODE REVIEW` or `READY FOR TEST` (PR is ready to advance but Jira doesn't reflect it)
+- **All PR comments replied** (at least one comment thread exists) and Jira status is not `READY FOR CODE REVIEW`, `READY FOR TEST`, or `READY FOR DEPLOY` (PR is ready to advance but Jira doesn't reflect it)
 
 **Filters:** Toggle checkboxes for "Show merged" and "Show closed" PRs. By default, only open PRs are displayed.
 

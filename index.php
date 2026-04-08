@@ -250,7 +250,7 @@ foreach ($prs as $pr) {
     // Highlight flag (any condition true => highlight)
     $allReplied = ($totalComments === 0 || $repliedComments >= $totalComments);
     $highlight = ($approvalCount >= 2 && in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR CODING']))
-              || ($allReplied && $totalComments > 0 && !in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR TEST']));
+              || ($allReplied && $totalComments > 0 && !in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR TEST', 'READY FOR DEPLOY']));
 
     $rows[] = [
         'number'            => $number,
