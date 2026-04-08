@@ -46,3 +46,16 @@ tr.highlight:hover td { background: #4d1a1e; }
 
 .rerequest-icon { color: #da3633; font-size: 0.85rem; margin-left: 0.3rem; cursor: help; }
 .conflict-badge { display: inline-block; background: #da3633; color: #fff; font-size: 10px; font-family: Arial, sans-serif; font-weight: 700; width: 18px; height: 18px; line-height: 19px; text-align: center; border-radius: 50%; margin-left: 0.4rem; vertical-align: middle; cursor: help; letter-spacing: 0; padding-left: 1px; }
+
+/* Events modal */
+.events-modal { position: fixed; top: 1.5rem; right: 1.5rem; width: 300px; background: #2d333b; border: 1px solid #444c56; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); z-index: 1000; font-size: 0.85rem; }
+.events-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #444c56; }
+.events-modal-title { color: #58a6ff; font-weight: 600; font-size: 0.9rem; }
+.events-modal-close { background: none; border: none; color: #adbac7; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; }
+.events-modal-close:hover { color: #ffffff; }
+.events-modal-body { padding: 10px 14px; max-height: 350px; overflow-y: auto; }
+.events-date-label { color: #adbac7; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 8px; margin-bottom: 4px; padding-bottom: 2px; border-bottom: 1px solid #444c56; }
+.events-date-label:first-child { margin-top: 0; }
+.events-item { display: flex; gap: 8px; padding: 4px 0; align-items: baseline; }
+.events-time { color: #cdd9e5; white-space: nowrap; min-width: 90px; }
+.events-title { color: #e6edf3; }

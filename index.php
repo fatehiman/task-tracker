@@ -1,6 +1,7 @@
 <?php
 set_time_limit(180);
 require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/zoho.php';
 
 // Filters from POST (unchecked checkboxes are absent from POST)
 $showMerged = isset($_POST['show_merged']);
@@ -413,6 +414,13 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
     ];
 }
 
+
+// Zoho Calendar events
+$zohoEvents = [];
+if (!empty($zohoClientId) && !empty($zohoRefreshToken) && !empty($zohoCalendarId)) {
+    $zohoEvents = fetchZohoEvents($zohoClientId, $zohoClientSecret, $zohoRefreshToken, $zohoCalendarId, $zohoIgnoreEvents ?? '');
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -533,5 +541,30 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
         </tbody>
     </table>
     <?php endif; ?>
+
+<?php if (!empty($zohoEvents)): ?>
+<div id="events-modal" class="events-modal">
+    <div class="events-modal-header">
+        <span class="events-modal-title">Events</span>
+        <button class="events-modal-close" onclick="document.getElementById('events-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="events-modal-body">
+        <?php
+        $currentLabel = '';
+        foreach ($zohoEvents as $evt):
+            if ($evt['label'] !== $currentLabel):
+                $currentLabel = $evt['label'];
+        ?>
+            <div class="events-date-label"><?= htmlspecialchars($currentLabel) ?></div>
+        <?php endif; ?>
+            <div class="events-item">
+                <span class="events-time"><?= $evt['start'] ?><?= $evt['end'] ? ' - ' . $evt['end'] : '' ?></span>
+                <span class="events-title"><?= htmlspecialchars($evt['title']) ?></span>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 </body>
 </html>

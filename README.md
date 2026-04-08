@@ -49,18 +49,26 @@ Jira tasks in the current sprint assigned to you that don't have a linked PR yet
 | **Jira Status** | Current status badge |
 | **Task cmnts** | Replied/total Jira comments |
 
+### 4. Zoho Calendar Events
+
+A floating notification box (top-right corner) showing today's and the next working day's events from your Zoho Calendar. Weekends are automatically skipped. The box can be dismissed with the close button.
+
+Events can be filtered out via the `$zohoIgnoreEvents` CSV setting in `env.php` (e.g. `'EBP Daily,Sprint Planning'`).
+
 ## Tech Stack
 
 - **PHP 8.x** with cURL
 - **GitHub REST API v3** — PR search, merge status
 - **GitHub GraphQL API** — mergeable state, reviews, review requests, review threads, timeline events
 - **Jira REST API v3** — issue search (`POST /rest/api/3/search/jql`), issue details, comments, user identity
+- **Zoho Calendar API** — OAuth2 token refresh, calendar event listing (EU datacenter)
 
 ## Project Structure
 
 ```
 public_html/
   index.php          # Main dashboard — all PHP logic and HTML rendering
+  zoho.php           # Zoho Calendar integration (OAuth, event fetching, RRULE parsing)
   style.css          # All CSS styles (dark theme)
   env.php            # Credentials (gitignored)
   env.sample.php     # Credential template
@@ -85,6 +93,12 @@ public_html/
    $jiraDomain = 'yourteam.atlassian.net';
    $jiraEmail  = 'you@example.com';
    $jiraToken  = 'your-jira-api-token';
+
+   $zohoClientId     = '';     // from api-console.zoho.eu (Self Client)
+   $zohoClientSecret = '';
+   $zohoRefreshToken = '';
+   $zohoCalendarId   = '';     // Zoho Calendar UID
+   $zohoIgnoreEvents = '';     // CSV: 'EBP Daily,Some Event'
    ```
 
 3. Serve with any PHP-capable web server (Apache, Nginx, or PHP built-in server):
@@ -99,6 +113,7 @@ public_html/
 
 - **GitHub token** must have `repo` scope for the target repository
 - **Jira token** is an [API token](https://id.atlassian.com/manage-profile/security/api-tokens) used with Basic Auth (email:token)
+- **Zoho Calendar** requires a Self Client app from [api-console.zoho.eu](https://api-console.zoho.eu) with scopes `ZohoCalendar.calendar.READ` and `ZohoCalendar.event.READ`
 - The dashboard uses `set_time_limit(180)` since it makes many sequential API calls
 
 ## Notes
@@ -107,4 +122,6 @@ public_html/
 - Filters (merged/closed) use POST and are not persisted between sessions
 - Jira ticket numbers are extracted from PR titles matching the pattern `[ED-XXXX]`
 - Parent/child Jira ticket relationships are displayed with arrow indicators and status tooltips
+- The `cubic-dev-ai` bot reviewer is automatically excluded from the "PRs Awaiting My Review" reviewers column
+- Zoho Calendar events are optional — if credentials are not set, the notification box is hidden
 - The `env.php` file is gitignored to prevent credential leaks
