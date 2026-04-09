@@ -22,3 +22,6 @@ $googleIgnoreEvents = '';     // CSV: 'Daily Standup,Some Event'
 
 $slackToken          = '';     // Slack user token (xoxp-...)
 $slackIgnoreChannels = '';     // CSV: 'general,random'
+
+$telegramBotToken = '';     // from @BotFather
+$telegramChatId   = '';     // your chat ID (use @userinfobot to find it)
