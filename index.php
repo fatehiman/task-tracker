@@ -2,6 +2,7 @@
 set_time_limit(180);
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/zoho.php';
+require_once __DIR__ . '/google.php';
 
 // Filters from POST (unchecked checkboxes are absent from POST)
 $showMerged = isset($_POST['show_merged']);
@@ -422,6 +423,16 @@ if (!empty($zohoClientId) && !empty($zohoRefreshToken) && !empty($zohoCalendarId
     $zohoEvents = fetchZohoEvents($zohoClientId, $zohoClientSecret, $zohoRefreshToken, $zohoCalendarId, $zohoIgnoreEvents ?? '');
 }
 
+// Google Calendar events
+$googleEvents = [];
+if (!empty($googleClientId) && !empty($googleRefreshToken) && !empty($googleCalendarId)) {
+    $googleEvents = fetchGoogleEvents($googleClientId, $googleClientSecret, $googleRefreshToken, $googleCalendarId, $googleIgnoreEvents ?? '');
+}
+
+// Merge all calendar events and sort by date+time
+$allCalendarEvents = array_merge($zohoEvents, $googleEvents);
+usort($allCalendarEvents, fn($a, $b) => ($a['date'] . $a['start']) <=> ($b['date'] . $b['start']));
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -543,7 +554,7 @@ if (!empty($zohoClientId) && !empty($zohoRefreshToken) && !empty($zohoCalendarId
     </table>
     <?php endif; ?>
 
-<?php if (!empty($zohoEvents)): ?>
+<?php if (!empty($allCalendarEvents)): ?>
 <div id="events-modal" class="events-modal">
     <div class="events-modal-header">
         <span class="events-modal-title">Events</span>
@@ -552,7 +563,7 @@ if (!empty($zohoClientId) && !empty($zohoRefreshToken) && !empty($zohoCalendarId
     <div class="events-modal-body">
         <?php
         $currentLabel = '';
-        foreach ($zohoEvents as $evt):
+        foreach ($allCalendarEvents as $evt):
             if ($evt['label'] !== $currentLabel):
                 $currentLabel = $evt['label'];
         ?>

@@ -13,3 +13,9 @@ $zohoClientSecret = '';
 $zohoRefreshToken = '';
 $zohoCalendarId   = '';     // Zoho Calendar UID
 $zohoIgnoreEvents = '';          // CSV: 'EBP Daily,Some Event'
+
+$googleClientId     = '';     // from Google Cloud Console (OAuth 2.0 Client)
+$googleClientSecret = '';
+$googleRefreshToken = '';
+$googleCalendarId   = '';     // 'primary' or calendar email address
+$googleIgnoreEvents = '';     // CSV: 'Daily Standup,Some Event'
