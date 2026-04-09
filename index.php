@@ -3,6 +3,7 @@ set_time_limit(180);
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/zoho.php';
 require_once __DIR__ . '/google.php';
+require_once __DIR__ . '/slack.php';
 
 // Filters from POST (unchecked checkboxes are absent from POST)
 $showMerged = isset($_POST['show_merged']);
@@ -433,6 +434,12 @@ if (!empty($googleClientId) && !empty($googleRefreshToken) && !empty($googleCale
 $allCalendarEvents = array_merge($zohoEvents, $googleEvents);
 usort($allCalendarEvents, fn($a, $b) => ($a['date'] . $a['start']) <=> ($b['date'] . $b['start']));
 
+// Slack unread messages
+$slackUnread = [];
+if (!empty($slackToken)) {
+    $slackUnread = fetchSlackUnread($slackToken, $slackIgnoreChannels ?? '');
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -572,6 +579,25 @@ usort($allCalendarEvents, fn($a, $b) => ($a['date'] . $a['start']) <=> ($b['date
             <div class="events-item">
                 <span class="events-time"><?= $evt['start'] ?><?= $evt['end'] ? ' - ' . $evt['end'] : '' ?></span>
                 <span class="events-title"><?= htmlspecialchars($evt['title']) ?></span>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($slackUnread)): ?>
+<div id="slack-modal" class="slack-modal">
+    <div class="slack-modal-header">
+        <span class="slack-modal-title">Slack (<?= count($slackUnread) ?>)</span>
+        <button class="slack-modal-close" onclick="document.getElementById('slack-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="slack-modal-body">
+        <?php foreach ($slackUnread as $ch): ?>
+            <div class="slack-item">
+                <span class="slack-channel <?= ($ch['is_im'] || $ch['is_mpim']) ? 'slack-dm' : '' ?>">
+                    <?= ($ch['is_im'] || $ch['is_mpim']) ? '' : '# ' ?><?= htmlspecialchars($ch['name']) ?>
+                </span>
+                <span class="slack-badge"><?= $ch['unread_count'] ?></span>
             </div>
         <?php endforeach; ?>
     </div>

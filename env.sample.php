@@ -19,3 +19,6 @@ $googleClientSecret = '';
 $googleRefreshToken = '';
 $googleCalendarId   = '';     // 'primary' or calendar email address
 $googleIgnoreEvents = '';     // CSV: 'Daily Standup,Some Event'
+
+$slackToken          = '';     // Slack user token (xoxp-...)
+$slackIgnoreChannels = '';     // CSV: 'general,random'
