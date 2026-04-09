@@ -84,8 +84,8 @@ foreach ($channels as $ch) {
     $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&oldest={$lastRead}&limit=50", $slackToken);
     $messages = $hist['messages'] ?? [];
 
-    // Filter: exclude last_read itself, already sent, and messages older than 1 minute
-    $oneMinAgo = (string)(time() - 60);
+    // Filter: exclude last_read itself, already sent, and messages older than 5 minutes
+    $oneMinAgo = (string)(time() - 300);
     foreach ($messages as $msg) {
         $ts = $msg['ts'] ?? '';
         if ($ts === $lastRead) continue;
