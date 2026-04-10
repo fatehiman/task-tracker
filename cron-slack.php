@@ -31,6 +31,10 @@ if (empty($slackToken) || empty($telegramBotToken) || empty($telegramChatId)) {
 $ignoreList = array_map('trim', explode(',', $slackIgnoreChannels ?? ''));
 $userCache = [];
 
+// Get authenticated user's ID to skip own messages
+$authData = slackApi("https://slack.com/api/auth.test", $slackToken);
+$myUserId = $authData['user_id'] ?? '';
+
 // Get all conversations
 $channels = [];
 $cursor = '';
@@ -74,22 +78,13 @@ foreach ($channels as $ch) {
 
     if (in_array($name, $ignoreList)) continue;
 
-    // Get last_read timestamp
-    $info = slackApi("https://slack.com/api/conversations.info?channel={$id}", $slackToken);
-    if (empty($info['ok'])) continue;
-
-    $lastRead = $info['channel']['last_read'] ?? '0';
-
-    // Fetch messages after last_read
-    $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&oldest={$lastRead}&limit=50", $slackToken);
+    // Fetch all messages from the last 5 minutes (ignore read status)
+    $since = (string)(time() - 300);
+    $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&oldest={$since}&limit=50", $slackToken);
     $messages = $hist['messages'] ?? [];
 
-    // Filter: exclude last_read itself, already sent, and messages older than 5 minutes
-    $oneMinAgo = (string)(time() - 300);
     foreach ($messages as $msg) {
         $ts = $msg['ts'] ?? '';
-        if ($ts === $lastRead) continue;
-        if ($ts < $oneMinAgo) continue;
         if (isset($sentIds[$ts])) {
             $newSentIds[$ts] = $sentIds[$ts];
             continue;
@@ -98,8 +93,11 @@ foreach ($channels as $ch) {
         $text = $msg['text'] ?? '';
         if ($text === '') continue;
 
-        // Resolve sender name
+        // Skip own messages
         $senderId = $msg['user'] ?? '';
+        if ($senderId === $myUserId) continue;
+
+        // Resolve sender name
         $senderName = $senderId;
         if ($senderId && !isset($userCache[$senderId])) {
             $uData = slackApi("https://slack.com/api/users.info?user={$senderId}", $slackToken);

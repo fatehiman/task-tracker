@@ -1,6 +1,6 @@
 # PR & Task Tracker
 
-A PHP dashboard that integrates **GitHub** and **Jira** APIs to provide a unified view of pull requests, code reviews, and sprint tasks.
+A PHP dashboard that integrates **GitHub**, **Jira**, **Zoho Calendar**, **Google Calendar**, **Slack**, and **Telegram** APIs to provide a unified view of pull requests, code reviews, sprint tasks, calendar events, and unread messages.
 
 ## Features
 
@@ -49,11 +49,29 @@ Jira tasks in the current sprint assigned to you that don't have a linked PR yet
 | **Jira Status** | Current status badge |
 | **Task cmnts** | Replied/total Jira comments |
 
-### 4. Zoho Calendar Events
+### 4. Calendar Events
 
-A floating notification box (top-right corner) showing today's and the next working day's events from your Zoho Calendar. Weekends are automatically skipped. The box can be dismissed with the close button.
+A floating notification box (top-right corner) showing today's and the next working day's events from **Zoho Calendar** and/or **Google Calendar**. Events from both sources are merged and sorted by date and time. Weekends are automatically skipped. The box can be dismissed with the close button.
 
-Events can be filtered out via the `$zohoIgnoreEvents` CSV setting in `env.php` (e.g. `'EBP Daily,Sprint Planning'`).
+Events can be filtered out per provider via CSV settings in `env.php`:
+- `$zohoIgnoreEvents` — e.g. `'EBP Daily,Sprint Planning'`
+- `$googleIgnoreEvents` — e.g. `'Daily Standup,Some Event'`
+
+### 5. Slack Unread Messages
+
+A floating notification box (top-right, beside the calendar events box) showing channels and DMs with unread messages. Each entry shows the channel name (prefixed with `#` for channels) or DM contact name (italicized) along with an unread count badge. The box can be dismissed with the close button.
+
+Channels can be excluded via the `$slackIgnoreChannels` CSV setting in `env.php`.
+
+### 6. Slack-to-Telegram Forwarder
+
+A cron-based service (`cron-slack.php`) that polls Slack every 20 seconds and forwards new messages to a Telegram group/chat via bot. Features:
+
+- Fetches all messages from the last 5 minutes across all channels (public, private, DMs, group DMs)
+- Uses a temp file (`cron-slack.tmp`) to track sent messages and prevent duplicates
+- Prevents re-entrance via file locking
+- Automatically prunes sent message history after 24 hours
+- Respects `$slackIgnoreChannels` exclusion list
 
 ## Tech Stack
 
@@ -62,17 +80,25 @@ Events can be filtered out via the `$zohoIgnoreEvents` CSV setting in `env.php` 
 - **GitHub GraphQL API** — mergeable state, reviews (fetches latest 100 to handle PRs with many review events), review requests, review threads, timeline events
 - **Jira REST API v3** — issue search (`POST /rest/api/3/search/jql`), issue details, comments, user identity
 - **Zoho Calendar API** — OAuth2 token refresh, calendar event listing (EU datacenter)
+- **Google Calendar API** — OAuth2 token refresh, calendar event listing
+- **Slack API** — `users.conversations`, `conversations.info`, `conversations.history`, `users.info`
+- **Telegram Bot API** — `sendMessage` with HTML formatting
 
 ## Project Structure
 
 ```
-public_html/
+task-tracker/
   index.php          # Main dashboard — all PHP logic and HTML rendering
   zoho.php           # Zoho Calendar integration (OAuth, event fetching, RRULE parsing)
+  google.php         # Google Calendar integration (OAuth, event fetching)
+  slack.php          # Slack integration (unread message detection across all channel types)
+  telegram.php       # Telegram Bot API wrapper (sendMessage)
+  cron-slack.php     # Cron job — forwards Slack messages to Telegram every 20s
   style.css          # All CSS styles (dark theme)
   env.php            # Credentials (gitignored)
   env.sample.php     # Credential template
-  .gitignore         # Excludes env.php
+  cron-slack.tmp     # Sent message tracking (gitignored)
+  .gitignore         # Excludes env.php and *.tmp
 ```
 
 ## Setup
@@ -86,19 +112,37 @@ public_html/
 2. Fill in your credentials in `env.php`:
 
    ```php
+   // GitHub
    $githubToken = 'your-github-token';       // OAuth or PAT with repo scope
    $githubRepo  = 'owner/repo';              // e.g. 'myorg/myrepo'
    $githubUser  = 'your-github-username';
 
+   // Jira
    $jiraDomain = 'yourteam.atlassian.net';
    $jiraEmail  = 'you@example.com';
    $jiraToken  = 'your-jira-api-token';
 
+   // Zoho Calendar (optional)
    $zohoClientId     = '';     // from api-console.zoho.eu (Self Client)
    $zohoClientSecret = '';
    $zohoRefreshToken = '';
    $zohoCalendarId   = '';     // Zoho Calendar UID
    $zohoIgnoreEvents = '';     // CSV: 'EBP Daily,Some Event'
+
+   // Google Calendar (optional)
+   $googleClientId     = '';     // from Google Cloud Console (OAuth 2.0 Client)
+   $googleClientSecret = '';
+   $googleRefreshToken = '';
+   $googleCalendarId   = '';     // 'primary' or calendar email address
+   $googleIgnoreEvents = '';     // CSV: 'Daily Standup,Some Event'
+
+   // Slack (optional)
+   $slackToken          = '';     // Slack user token (xoxp-...)
+   $slackIgnoreChannels = '';     // CSV: 'general,random'
+
+   // Telegram (optional — required for Slack-to-Telegram forwarder)
+   $telegramBotToken = '';     // from @BotFather
+   $telegramChatId   = '';     // your chat ID (use @userinfobot to find it)
    ```
 
 3. Serve with any PHP-capable web server (Apache, Nginx, or PHP built-in server):
@@ -109,19 +153,30 @@ public_html/
 
 4. Open `http://localhost:8080/index.php` in your browser.
 
+5. (Optional) Set up the Slack-to-Telegram cron (runs every 20 seconds):
+
+   ```
+   * * * * * php /path/to/task-tracker/cron-slack.php
+   * * * * * sleep 20 && php /path/to/task-tracker/cron-slack.php
+   * * * * * sleep 40 && php /path/to/task-tracker/cron-slack.php
+   ```
+
 ## API Requirements
 
 - **GitHub token** must have `repo` scope for the target repository
 - **Jira token** is an [API token](https://id.atlassian.com/manage-profile/security/api-tokens) used with Basic Auth (email:token)
 - **Zoho Calendar** requires a Self Client app from [api-console.zoho.eu](https://api-console.zoho.eu) with scopes `ZohoCalendar.calendar.READ` and `ZohoCalendar.event.READ`
-- The dashboard uses `set_time_limit(180)` since it makes many sequential API calls
+- **Google Calendar** requires an OAuth 2.0 Client from Google Cloud Console with scope `https://www.googleapis.com/auth/calendar.readonly`
+- **Slack** requires a Slack App with User Token Scopes: `channels:read`, `channels:history`, `groups:read`, `groups:history`, `im:read`, `im:history`, `mpim:read`, `mpim:history`, `users:read`
+- **Telegram** requires a bot created via [@BotFather](https://t.me/BotFather) and added to the target chat/group
 
 ## Notes
 
-- No caching — every page load fetches fresh data from both APIs
+- No caching — every page load fetches fresh data from all APIs
 - Filters (merged/closed) use POST and are not persisted between sessions
 - Jira ticket numbers are extracted from PR titles matching the pattern `[ED-XXXX]`
 - Parent/child Jira ticket relationships are displayed with arrow indicators and status tooltips
 - The `cubic-dev-ai` bot reviewer is automatically excluded from the "PRs Awaiting My Review" reviewers column
-- Zoho Calendar events are optional — if credentials are not set, the notification box is hidden
+- Calendar events and Slack notifications are optional — if credentials are not set, the respective UI elements are hidden
 - The `env.php` file is gitignored to prevent credential leaks
+- The dashboard uses `set_time_limit(180)` since it makes many sequential API calls
