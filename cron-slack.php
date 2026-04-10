@@ -83,7 +83,27 @@ foreach ($channels as $ch) {
     $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&oldest={$since}&limit=50", $slackToken);
     $messages = $hist['messages'] ?? [];
 
+    // Collect all messages including thread replies
+    $allMessages = [];
     foreach ($messages as $msg) {
+        $allMessages[] = $msg;
+
+        // If this message has thread replies, fetch them too
+        $replyCount = $msg['reply_count'] ?? 0;
+        if ($replyCount > 0) {
+            $threadTs = $msg['thread_ts'] ?? $msg['ts'];
+            $replies = slackApi("https://slack.com/api/conversations.replies?channel={$id}&ts={$threadTs}&oldest={$since}&limit=50", $slackToken);
+            foreach ($replies['messages'] ?? [] as $reply) {
+                // Skip the parent message (already in $allMessages)
+                if (($reply['ts'] ?? '') === $threadTs) continue;
+                $allMessages[] = $reply;
+            }
+        }
+    }
+
+    $prefix = ($isIm || $isMpim) ? $name : "#{$name}";
+
+    foreach ($allMessages as $msg) {
         $ts = $msg['ts'] ?? '';
         if (isset($sentIds[$ts])) {
             $newSentIds[$ts] = $sentIds[$ts];
@@ -110,9 +130,10 @@ foreach ($channels as $ch) {
             $senderName = $userCache[$senderId] ?? $senderId;
         }
 
-        // Build Telegram message
-        $prefix = ($isIm || $isMpim) ? $name : "#{$name}";
-        $tgText = "<b>{$prefix}</b>\n<b>{$senderName}</b>: " . htmlspecialchars($text);
+        // Build Telegram message (indicate thread replies)
+        $isThread = isset($msg['thread_ts']) && $msg['ts'] !== $msg['thread_ts'];
+        $label = $isThread ? "{$prefix} (thread)" : $prefix;
+        $tgText = "<b>{$label}</b>\n<b>{$senderName}</b>: " . htmlspecialchars($text);
 
         telegramSendMessage($telegramBotToken, $telegramChatId, $tgText);
 
