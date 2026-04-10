@@ -17,10 +17,11 @@ if (!flock($fp, LOCK_EX | LOCK_NB)) {
     exit;
 }
 
-// Load previously sent message IDs
+// Load state
 $contents = stream_get_contents($fp);
 $data = $contents ? json_decode($contents, true) : [];
 $sentIds = $data['sent'] ?? [];
+$prevStatuses = $data['statuses'] ?? [];
 
 if (empty($slackToken) || empty($telegramBotToken) || empty($telegramChatId)) {
     flock($fp, LOCK_UN);
@@ -148,6 +149,58 @@ foreach ($channels as $ch) {
     }
 }
 
+// --- User status tracking ---
+$curStatuses = [];
+$usersResp = slackApi("https://slack.com/api/users.list?limit=200", $slackToken);
+foreach ($usersResp['members'] ?? [] as $u) {
+    if ($u['is_bot'] ?? false) continue;
+    if ($u['deleted'] ?? false) continue;
+    if ($u['id'] === 'USLACKBOT') continue;
+
+    $uid  = $u['id'];
+    $name = $u['profile']['display_name'] ?: ($u['profile']['real_name'] ?: $u['name']);
+    $statusText  = $u['profile']['status_text'] ?? '';
+    $statusEmoji = $u['profile']['status_emoji'] ?? '';
+
+    // Get presence (online/away)
+    $presResp = slackApi("https://slack.com/api/users.getPresence?user={$uid}", $slackToken);
+    $presence = $presResp['presence'] ?? 'unknown';
+
+    $curStatuses[$uid] = [
+        'name'     => $name,
+        'presence' => $presence,
+        'status'   => $statusText,
+        'emoji'    => $statusEmoji,
+    ];
+
+    // Compare with previous state
+    if (!empty($prevStatuses)) {
+        $prev = $prevStatuses[$uid] ?? null;
+        if ($prev === null) continue; // new user, skip first notification
+
+        $changes = [];
+
+        if ($prev['presence'] !== $presence) {
+            $changes[] = "{$prev['presence']} -> {$presence}";
+        }
+
+        $prevStatus = trim(($prev['emoji'] ?? '') . ' ' . ($prev['status'] ?? ''));
+        $curStatus  = trim("{$statusEmoji} {$statusText}");
+        if ($prevStatus !== $curStatus) {
+            if ($curStatus === '') {
+                $changes[] = "cleared status";
+            } else {
+                $changes[] = "status: {$curStatus}";
+            }
+        }
+
+        if (!empty($changes)) {
+            $tgText = "<b>{$name}</b>: " . htmlspecialchars(implode(' | ', $changes));
+            telegramSendMessage($telegramBotToken, $telegramChatId, $tgText);
+        }
+    }
+}
+
 // Merge and prune entries older than 24 hours
 $cutoff = time() - 86400;
 foreach ($sentIds as $ts => $sentAt) {
@@ -159,6 +212,6 @@ foreach ($sentIds as $ts => $sentAt) {
 // Write back to tmp file
 ftruncate($fp, 0);
 rewind($fp);
-fwrite($fp, json_encode(['sent' => $newSentIds]));
+fwrite($fp, json_encode(['sent' => $newSentIds, 'statuses' => $curStatuses]));
 flock($fp, LOCK_UN);
 fclose($fp);
