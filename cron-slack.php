@@ -78,30 +78,37 @@ foreach ($channels as $ch) {
 
     if (in_array($name, $ignoreList)) continue;
 
-    // Fetch all messages from the last 5 minutes (ignore read status)
+    // Fetch recent messages and threads with recent replies
     $since = (string)(time() - 300);
-    $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&oldest={$since}&limit=50", $slackToken);
+
+    // Get recent top-level messages (including older ones with active threads)
+    $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&limit=30", $slackToken);
     $messages = $hist['messages'] ?? [];
 
-    // Collect all messages including thread replies
+    // Collect all messages including thread replies from the last 5 minutes
     $allMessages = [];
     foreach ($messages as $msg) {
-        $allMessages[] = $msg;
+        $ts = $msg['ts'] ?? '';
 
-        // If this message has thread replies, fetch them too
+        // Include top-level messages only if recent
+        if ($ts >= $since) {
+            $allMessages[] = $msg;
+        }
+
+        // Check threads: if latest reply is recent, fetch replies
         $replyCount = $msg['reply_count'] ?? 0;
-        if ($replyCount > 0) {
-            $threadTs = $msg['thread_ts'] ?? $msg['ts'];
+        $latestReply = $msg['latest_reply'] ?? '0';
+        if ($replyCount > 0 && $latestReply >= $since) {
+            $threadTs = $msg['thread_ts'] ?? $ts;
             $replies = slackApi("https://slack.com/api/conversations.replies?channel={$id}&ts={$threadTs}&oldest={$since}&limit=50", $slackToken);
             foreach ($replies['messages'] ?? [] as $reply) {
-                // Skip the parent message (already in $allMessages)
                 if (($reply['ts'] ?? '') === $threadTs) continue;
                 $allMessages[] = $reply;
             }
         }
     }
 
-    $prefix = ($isIm || $isMpim) ? $name : "#{$name}";
+    $prefix = $name;
 
     foreach ($allMessages as $msg) {
         $ts = $msg['ts'] ?? '';
