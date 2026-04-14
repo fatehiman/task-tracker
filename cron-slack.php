@@ -80,7 +80,7 @@ foreach ($channels as $ch) {
     if (in_array($name, $ignoreList)) continue;
 
     // Fetch recent messages and threads with recent replies
-    $since = (string)(time() - 300);
+    $since = (string)(time() - ($slackFetchMinutes * 60));
 
     // Get recent top-level messages (including older ones with active threads)
     $hist = slackApi("https://slack.com/api/conversations.history?channel={$id}&limit=30", $slackToken);

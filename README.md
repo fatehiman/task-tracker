@@ -67,7 +67,7 @@ Channels can be excluded via the `$slackIgnoreChannels` CSV setting in `env.php`
 
 A cron-based service (`cron-slack.php`) that polls Slack every 20 seconds and forwards new messages to a Telegram group/chat via bot. Features:
 
-- Fetches all messages from the last 5 minutes across all channels (public, private, DMs, group DMs)
+- Fetches messages from the last N minutes across all channels (public, private, DMs, group DMs) — configurable via `$slackFetchMinutes` in `env.php` (default: 5)
 - Uses a temp file (`cron-slack.tmp`) to track sent messages and prevent duplicates
 - Prevents re-entrance via file locking
 - Automatically prunes sent message history after 24 hours
@@ -143,6 +143,8 @@ task-tracker/
    // Telegram (optional — required for Slack-to-Telegram forwarder)
    $telegramBotToken = '';     // from @BotFather
    $telegramChatId   = '';     // your chat ID (use @userinfobot to find it)
+
+   $slackFetchMinutes = 5;     // how far back to fetch Slack messages (in minutes)
    ```
 
 3. Serve with any PHP-capable web server (Apache, Nginx, or PHP built-in server):

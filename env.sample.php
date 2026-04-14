@@ -25,3 +25,5 @@ $slackIgnoreChannels = '';     // CSV: 'general,random'
 
 $telegramBotToken = '';     // from @BotFather
 $telegramChatId   = '';     // your chat ID (use @userinfobot to find it)
+
+$slackFetchMinutes = 5;     // how far back to fetch Slack messages (in minutes)
