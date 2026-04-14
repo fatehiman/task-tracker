@@ -39,7 +39,8 @@ function fetchGoogleEvents(string $clientId, string $clientSecret, string $refre
     $accessToken = googleRefreshAccessToken($clientId, $clientSecret, $refreshToken);
     if (!$accessToken) return [];
 
-    $tz = new DateTimeZone('Europe/Bucharest');
+    global $timezone;
+    $tz = new DateTimeZone($timezone);
     $today = new DateTimeImmutable('today', $tz);
     $nextWork = getNextWorkingDay($today);
 
@@ -81,11 +82,12 @@ function fetchGoogleEvents(string $clientId, string $clientSecret, string $refre
             if ($evtDate !== $todayStr && $evtDate !== $nextStr) continue;
             $label = ($evtDate === $todayStr) ? $todayLabel : $nextLabel;
             $events[] = [
-                'title' => $title,
-                'start' => 'All day',
-                'end'   => '',
-                'date'  => $evtDate,
-                'label' => $label,
+                'title'    => $title,
+                'start'    => 'All day',
+                'end'      => '',
+                'date'     => $evtDate,
+                'label'    => $label,
+                'end_full' => $evtDate . ' 23:59',
             ];
         } else {
             $startDt = new DateTimeImmutable($startRaw);
@@ -95,18 +97,22 @@ function fetchGoogleEvents(string $clientId, string $clientSecret, string $refre
 
             $startTime = $startDt->format('H:i');
             $endTime = '';
+            $endFull = '';
             if ($endRaw) {
                 $endDt = new DateTimeImmutable($endRaw);
-                $endTime = $endDt->setTimezone($tz)->format('H:i');
+                $endDt = $endDt->setTimezone($tz);
+                $endTime = $endDt->format('H:i');
+                $endFull = $endDt->format('Y-m-d H:i');
             }
 
             $label = ($evtDate === $todayStr) ? $todayLabel : $nextLabel;
             $events[] = [
-                'title' => $title,
-                'start' => $startTime,
-                'end'   => $endTime,
-                'date'  => $evtDate,
-                'label' => $label,
+                'title'    => $title,
+                'start'    => $startTime,
+                'end'      => $endTime,
+                'date'     => $evtDate,
+                'label'    => $label,
+                'end_full' => $endFull,
             ];
         }
     }

@@ -44,14 +44,17 @@ function getNextWorkingDay(DateTimeImmutable $from): DateTimeImmutable {
 
 /**
  * Parse Zoho datetime string like "20260408T090000+0200" into a DateTimeImmutable.
+ * The offset in the string is from the event's original timezone, so use $eventTz
+ * to interpret the local time correctly.
  */
-function parseZohoDate(string $str): ?DateTimeImmutable {
+function parseZohoDate(string $str, string $eventTz = ''): ?DateTimeImmutable {
     // Format: YYYYMMDDTHHmmSS+HHMM or YYYYMMDDTHHmmSSZ
     $str = trim($str);
-    if (preg_match('/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(.*)$/', $str, $m)) {
-        $iso = "{$m[1]}-{$m[2]}-{$m[3]}T{$m[4]}:{$m[5]}:{$m[6]}{$m[7]}";
+    if (preg_match('/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/', $str, $m)) {
+        $localTime = "{$m[1]}-{$m[2]}-{$m[3]}T{$m[4]}:{$m[5]}:{$m[6]}";
         try {
-            return new DateTimeImmutable($iso);
+            $tz = $eventTz ? new DateTimeZone($eventTz) : null;
+            return new DateTimeImmutable($localTime, $tz);
         } catch (Exception $e) {
             return null;
         }
@@ -129,7 +132,8 @@ function fetchZohoEvents(string $clientId, string $clientSecret, string $refresh
     $url = "https://calendar.zoho.eu/api/v1/calendars/{$calendarId}/events";
     $data = zohoCalendarApi($url, $accessToken);
 
-    $tz = new DateTimeZone('Europe/Bucharest');
+    global $timezone;
+    $tz = new DateTimeZone($timezone);
     $today = new DateTimeImmutable('today', $tz);
     $nextWork = getNextWorkingDay($today);
 
@@ -145,27 +149,32 @@ function fetchZohoEvents(string $clientId, string $clientSecret, string $refresh
         $dtInfo = $evt['dateandtime'] ?? [];
         $startStr = $dtInfo['start'] ?? '';
         $endStr   = $dtInfo['end'] ?? '';
+        $eventTz  = $dtInfo['timezone'] ?? '';
         $rrule = $evt['rrule'] ?? '';
 
-        $startDt = parseZohoDate($startStr);
+        $startDt = parseZohoDate($startStr, $eventTz);
         if (!$startDt) continue;
 
         $startTime = $startDt->setTimezone($tz)->format('H:i');
-        $endDt = parseZohoDate($endStr);
+        $endDt = parseZohoDate($endStr, $eventTz);
         $endTime = $endDt ? $endDt->setTimezone($tz)->format('H:i') : '';
 
         if (in_array($title, $ignoreList)) continue;
+
+        // Full end datetime string for filtering passed events
+        $endFull = $endDt ? $endDt->setTimezone($tz)->format('Y-m-d H:i') : '';
 
         if ($rrule) {
             // Recurring event — check both days
             foreach ([$todayStr => $todayLabel, $nextStr => $nextLabel] as $dateStr => $label) {
                 if (rruleMatchesDate($rrule, $startDt, $dateStr)) {
                     $events[] = [
-                        'title' => $title,
-                        'start' => $startTime,
-                        'end'   => $endTime,
-                        'date'  => $dateStr,
-                        'label' => $label,
+                        'title'    => $title,
+                        'start'    => $startTime,
+                        'end'      => $endTime,
+                        'date'     => $dateStr,
+                        'label'    => $label,
+                        'end_full' => $dateStr . ' ' . $endTime,
                     ];
                 }
             }
@@ -175,11 +184,12 @@ function fetchZohoEvents(string $clientId, string $clientSecret, string $refresh
             if ($evtDate === $todayStr || $evtDate === $nextStr) {
                 $label = ($evtDate === $todayStr) ? $todayLabel : $nextLabel;
                 $events[] = [
-                    'title' => $title,
-                    'start' => $startTime,
-                    'end'   => $endTime,
-                    'date'  => $evtDate,
-                    'label' => $label,
+                    'title'    => $title,
+                    'start'    => $startTime,
+                    'end'      => $endTime,
+                    'date'     => $evtDate,
+                    'label'    => $label,
+                    'end_full' => $endFull,
                 ];
             }
         }

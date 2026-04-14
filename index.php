@@ -430,8 +430,12 @@ if (!empty($googleClientId) && !empty($googleRefreshToken) && !empty($googleCale
     $googleEvents = fetchGoogleEvents($googleClientId, $googleClientSecret, $googleRefreshToken, $googleCalendarId, $googleIgnoreEvents ?? '');
 }
 
-// Merge all calendar events and sort by date+time
-$allCalendarEvents = array_merge($zohoEvents, $googleEvents);
+// Merge all calendar events, filter out passed ones, and sort by date+time
+$now = (new DateTimeImmutable('now', new DateTimeZone($timezone)))->format('Y-m-d H:i');
+$allCalendarEvents = array_filter(
+    array_merge($zohoEvents, $googleEvents),
+    fn($e) => empty($e['end_full']) || $e['end_full'] >= $now
+);
 usort($allCalendarEvents, fn($a, $b) => ($a['date'] . $a['start']) <=> ($b['date'] . $b['start']));
 
 // Slack unread messages

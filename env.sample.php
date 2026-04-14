@@ -1,5 +1,7 @@
 <?php
 
+$timezone = 'Europe/Bucharest';  // your local timezone
+
 $githubToken = '';
 $githubRepo  = '';    //e.g. transferfintech/ebankp
 $githubUser  = '';    //github username not email e.g. ioan-ebankplatform
