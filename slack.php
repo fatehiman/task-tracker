@@ -18,7 +18,7 @@ function slackApi(string $url, string $token): array {
 }
 
 function fetchSlackUnread(string $token, string $ignoreChannels = ''): array {
-    $ignoreList = array_map('trim', explode(',', $ignoreChannels));
+    $ignoreList = array_filter(array_map('trim', explode(',', $ignoreChannels)), fn($v) => $v !== '');
 
     // Get all conversations the user is a member of
     $channels = [];
@@ -41,6 +41,19 @@ function fetchSlackUnread(string $token, string $ignoreChannels = ''): array {
 
     // For IMs/MPIMs, resolve display names
     $userCache = [];
+    $resolveUser = function(string $userId) use ($token, &$userCache) {
+        if ($userId === '') return '';
+        if (!array_key_exists($userId, $userCache)) {
+            $uData = slackApi("https://slack.com/api/users.info?user={$userId}", $token);
+            $profile = $uData['user']['profile'] ?? [];
+            $resolved = trim((string)($profile['display_name'] ?? ''));
+            if ($resolved === '') $resolved = trim((string)($profile['real_name'] ?? ''));
+            if ($resolved === '') $resolved = trim((string)($uData['user']['name'] ?? ''));
+            if ($resolved === '') $resolved = $userId;
+            $userCache[$userId] = $resolved;
+        }
+        return $userCache[$userId];
+    };
 
     $unread = [];
     foreach ($channels as $ch) {
@@ -51,21 +64,30 @@ function fetchSlackUnread(string $token, string $ignoreChannels = ''): array {
 
         // For DMs, resolve the user's display name
         if ($isIm) {
-            $userId = $ch['user'] ?? '';
-            if ($userId && !isset($userCache[$userId])) {
-                $uData = slackApi("https://slack.com/api/users.info?user={$userId}", $token);
-                $userCache[$userId] = $uData['user']['profile']['display_name']
-                    ?? $uData['user']['profile']['real_name']
-                    ?? $uData['user']['name']
-                    ?? $userId;
-            }
-            $name = $userCache[$userId] ?? $userId;
+            $name = $resolveUser($ch['user'] ?? '');
         } elseif ($isMpim) {
-            // Group DMs have a generated name like "mpdm-user1--user2--user3-1"
-            $name = $ch['purpose']['value'] ?? $name;
+            // Group DMs: prefer purpose; fallback to resolving member display names
+            $purpose = trim((string)($ch['purpose']['value'] ?? ''));
+            if ($purpose !== '') {
+                $name = $purpose;
+            } else {
+                $members = slackApi("https://slack.com/api/conversations.members?channel={$id}&limit=10", $token);
+                $resolved = [];
+                foreach ($members['members'] ?? [] as $uid) {
+                    $n = $resolveUser($uid);
+                    if ($n !== '') $resolved[] = $n;
+                }
+                if (!empty($resolved)) {
+                    $name = implode(', ', $resolved);
+                }
+                // else keep the generated mpdm-... name as last-resort fallback
+            }
         }
 
-        if (in_array($name, $ignoreList)) continue;
+        // Skip entries with no resolvable name (prevents empty rows with just a badge)
+        if (trim((string)$name) === '') continue;
+
+        if (in_array($name, $ignoreList, true)) continue;
 
         // Get channel info for last_read, then compare with latest message
         $info = slackApi("https://slack.com/api/conversations.info?channel={$id}", $token);
