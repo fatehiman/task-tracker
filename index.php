@@ -93,6 +93,15 @@ function jiraTicketNum(string $key): string {
     return preg_match('/ED-(\d+)/', $key, $m) ? $m[1] : $key;
 }
 
+function priorityLabel(string $priority, $storyPoints = null): string {
+    if (!$priority) return '';
+    $abbr = ['Medium' => 'Med', 'Highest' => 'Highest', 'Lowest' => 'Lowest'];
+    $short = $abbr[$priority] ?? $priority;
+    $sp = ($storyPoints !== null && $storyPoints !== '' && $storyPoints !== 0) ? intval($storyPoints) : null;
+    $text = $sp !== null ? "{$short}-{$sp}" : $short;
+    return ' <span class="priority-label">(' . htmlspecialchars($text) . ')</span>';
+}
+
 function renderTicketCell(string $num, string $key, string $parent, string $child, string $domain, string $parentStatus = '', string $childStatus = ''): string {
     $mainLink = $key ? '<a href="https://' . htmlspecialchars($domain) . '/browse/' . htmlspecialchars($key) . '" target="_blank">' . htmlspecialchars($num) . '</a>' : '-';
 
@@ -238,14 +247,18 @@ foreach ($prs as $pr) {
     $jiraChild  = '';
     $jiraParentStatus = '';
     $jiraChildStatus  = '';
+    $jiraPriority = '';
+    $jiraStoryPoints = null;
     if ($jiraKey) {
-        $jiraData = jiraApi("https://{$jiraDomain}/rest/api/3/issue/{$jiraKey}?fields=status,parent,subtasks", $jiraEmail, $jiraToken);
+        $jiraData = jiraApi("https://{$jiraDomain}/rest/api/3/issue/{$jiraKey}?fields=status,parent,subtasks,priority,customfield_10026", $jiraEmail, $jiraToken);
         $jiraStatus = $jiraData['fields']['status']['name'] ?? '-';
         $jiraParent = $jiraData['fields']['parent']['key'] ?? '';
         $jiraParentStatus = $jiraData['fields']['parent']['fields']['status']['name'] ?? '';
         $subtasks = $jiraData['fields']['subtasks'] ?? [];
         $jiraChild = !empty($subtasks) ? $subtasks[0]['key'] : '';
         $jiraChildStatus = !empty($subtasks) ? ($subtasks[0]['fields']['status']['name'] ?? '') : '';
+        $jiraPriority = $jiraData['fields']['priority']['name'] ?? '';
+        $jiraStoryPoints = $jiraData['fields']['customfield_10026'] ?? null;
     }
 
     // Jira comment stats
@@ -268,6 +281,8 @@ foreach ($prs as $pr) {
         'jira_child_status' => $jiraChildStatus,
         'jira_cmts_replied' => $jiraCmts['replied'],
         'jira_cmts_total'   => $jiraCmts['total'],
+        'jira_priority'     => $jiraPriority,
+        'jira_story_points' => $jiraStoryPoints,
         'approvals'         => $approvalCount,
         'total_reviewers'   => $totalReviewers,
         'reviewer_names'    => $allReviewers ? implode(', ', array_map(fn($login) => $login . ' (' . ($reviewerStates[$login] ?? 'PENDING') . ')', array_keys($allReviewers))) : '',
@@ -384,7 +399,7 @@ $jiraSearch = jiraApi(
     $jiraToken,
     [
         'jql'        => 'assignee=currentUser() AND sprint in openSprints() ORDER BY status ASC',
-        'fields'     => ['key', 'summary', 'status', 'parent', 'subtasks'],
+        'fields'     => ['key', 'summary', 'status', 'parent', 'subtasks', 'priority', 'customfield_10026'],
         'maxResults' => 50,
     ]
 );
@@ -408,6 +423,8 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
         'num'                => $num,
         'title'              => $issue['fields']['summary'] ?? '',
         'status'             => $issue['fields']['status']['name'] ?? '-',
+        'priority'           => $issue['fields']['priority']['name'] ?? '',
+        'story_points'       => $issue['fields']['customfield_10026'] ?? null,
         'jira_parent'        => $parentKey,
         'jira_parent_status' => $parentStatus,
         'jira_child'         => $childKey,
@@ -416,6 +433,18 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
         'jira_cmts_total'    => $taskCmts['total'],
     ];
 }
+
+// Sort sprint tasks by priority (DONE and ABANDONED always at the bottom)
+$priorityOrder = ['Highest' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3, 'Lowest' => 4];
+$finishedStatuses = ['DONE', 'ABANDONED'];
+usort($sprintTasks, function ($a, $b) use ($priorityOrder, $finishedStatuses) {
+    $aDone = in_array(strtoupper($a['status']), $finishedStatuses) ? 1 : 0;
+    $bDone = in_array(strtoupper($b['status']), $finishedStatuses) ? 1 : 0;
+    if ($aDone !== $bDone) return $aDone - $bDone;
+    $pa = $priorityOrder[$a['priority']] ?? 5;
+    $pb = $priorityOrder[$b['priority']] ?? 5;
+    return $pa - $pb;
+});
 
 
 // Zoho Calendar events
@@ -477,7 +506,7 @@ if (!empty($slackToken)) {
             <?php foreach ($rows as $row): ?>
             <tr<?= $row['highlight'] ? ' class="highlight"' : '' ?>>
                 <td><a href="https://github.com/<?= htmlspecialchars($githubRepo) ?>/pull/<?= $row['number'] ?>" target="_blank">#<?= $row['number'] ?></a></td>
-                <td><?= htmlspecialchars($row['title']) ?><?php if ($row['has_conflict']): ?><span class="conflict-badge" title="Conflict">C</span><?php endif; ?></td>
+                <td><?= htmlspecialchars($row['title']) ?><?= priorityLabel($row['jira_priority'], $row['jira_story_points']) ?><?php if ($row['has_conflict']): ?><span class="conflict-badge" title="Conflict">C</span><?php endif; ?></td>
                 <td><?= renderTicketCell($row['jira_num'], $row['jira_key'], $row['jira_parent'], $row['jira_child'], $jiraDomain, $row['jira_parent_status'], $row['jira_child_status']) ?></td>
                 <?php $jiraBadge = strtoupper($row['jira_status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $jiraBadge ?>"><?= htmlspecialchars($row['jira_status']) ?></span></td>
@@ -552,9 +581,10 @@ if (!empty($slackToken)) {
         </thead>
         <tbody>
             <?php foreach ($sprintTasks as $task): ?>
+            <?php $isFinished = in_array(strtoupper($task['status']), ['DONE', 'ABANDONED']); ?>
             <tr>
                 <td><?= renderTicketCell($task['num'], $task['key'], $task['jira_parent'], $task['jira_child'], $jiraDomain, $task['jira_parent_status'], $task['jira_child_status']) ?></td>
-                <td><?= htmlspecialchars($task['title']) ?></td>
+                <td<?= $isFinished ? ' class="title-muted"' : '' ?>><?= htmlspecialchars($task['title']) ?><?= priorityLabel($task['priority'], $task['story_points']) ?></td>
                 <?php $taskBadge = strtoupper($task['status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $taskBadge ?>"><?= htmlspecialchars($task['status']) ?></span></td>
                 <?php $tCmtClass = ($task['jira_cmts_total'] > $task['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
