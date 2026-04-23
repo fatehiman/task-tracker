@@ -196,7 +196,7 @@ foreach ($usersResp['members'] ?? [] as $u) {
 
         if (!empty($changes)) {
             $tgText = "<b>{$name}</b>: " . htmlspecialchars(implode(' | ', $changes));
-            telegramSendMessage($telegramBotToken, $telegramChatId, $tgText);
+            telegramSendMessage($telegramBotToken, $telegramChatId, $tgText, 'HTML', true);
         }
     }
 }

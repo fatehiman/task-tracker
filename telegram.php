@@ -17,10 +17,11 @@ function telegramApi(string $botToken, string $method, array $params = []): arra
     return $resp ?? [];
 }
 
-function telegramSendMessage(string $botToken, string $chatId, string $text, string $parseMode = 'HTML'): array {
+function telegramSendMessage(string $botToken, string $chatId, string $text, string $parseMode = 'HTML', bool $silent = false): array {
     return telegramApi($botToken, 'sendMessage', [
-        'chat_id'    => $chatId,
-        'text'       => $text,
-        'parse_mode' => $parseMode,
+        'chat_id'             => $chatId,
+        'text'                => $text,
+        'parse_mode'          => $parseMode,
+        'disable_notification' => $silent,
     ]);
 }
