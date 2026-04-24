@@ -6,9 +6,10 @@ $githubToken = '';
 $githubRepo  = '';    //e.g. transferfintech/ebankp
 $githubUser  = '';    //github username not email e.g. ioan-ebankplatform
 
-$jiraDomain = '';   //e.g. ebankp.atlassian.net
-$jiraEmail  = '';
-$jiraToken  = '';
+$jiraDomain  = '';   //e.g. ebankp.atlassian.net
+$jiraEmail   = '';
+$jiraToken   = '';
+$jiraBoardId = '';   // scrum board id (numeric), used to fetch the active sprint
 
 $zohoClientId     = '';     // from api-console.zoho.eu (Self Client)
 $zohoClientSecret = '';

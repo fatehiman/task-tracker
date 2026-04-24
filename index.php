@@ -391,6 +391,17 @@ do {
     $rvPage++;
 } while (count($rvItems) === 100);
 
+// Fetch active sprint for the configured board
+$activeSprint = null;
+if (!empty($jiraBoardId)) {
+    $sprintResp = jiraApi(
+        "https://{$jiraDomain}/rest/agile/1.0/board/{$jiraBoardId}/sprint?state=active",
+        $jiraEmail,
+        $jiraToken
+    );
+    $activeSprint = $sprintResp['values'][0] ?? null;
+}
+
 // Fetch current sprint tasks assigned to me
 $sprintTasks = [];
 $jiraSearch = jiraApi(
@@ -569,7 +580,32 @@ if (!empty($slackToken)) {
 
     <?php if ($sprintTasks): ?>
     <h2>Sprint Tasks Without PR</h2>
-    <p class="meta"><?= count($sprintTasks) ?> tasks in current sprint with no linked PR</p>
+    <?php
+        $activeTaskCount = count(array_filter(
+            $sprintTasks,
+            fn($t) => !in_array(strtoupper($t['status']), $finishedStatuses)
+        ));
+        $sprintLine = '';
+        if ($activeSprint) {
+            $tz = new DateTimeZone($timezone);
+            $sprintStart = new DateTimeImmutable($activeSprint['startDate'], $tz);
+            $sprintEnd   = new DateTimeImmutable($activeSprint['endDate'], $tz);
+            $today       = new DateTimeImmutable('today', $tz);
+            $daysLeft = 0;
+            $cursor   = $today;
+            while ($cursor < $sprintEnd) {
+                if ((int) $cursor->format('N') < 6) $daysLeft++;
+                $cursor = $cursor->modify('+1 day');
+            }
+            $sprintLine  = htmlspecialchars($activeSprint['name']) . ' '
+                . $sprintStart->format('D j M') . ' - ' . $sprintEnd->format('D j M');
+        }
+    ?>
+    <p class="meta">
+        <?php if ($sprintLine): ?><?= $sprintLine ?> &middot; <?php endif; ?>
+        <?= $activeTaskCount ?> tasks in current sprint with no linked PR
+        <?php if ($activeSprint): ?>&middot; <?= $daysLeft ?> days left<?php endif; ?>
+    </p>
     <table>
         <thead>
             <tr>
