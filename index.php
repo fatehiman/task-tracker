@@ -285,7 +285,7 @@ foreach ($prs as $pr) {
     // Highlight flag (any condition true => highlight)
     $allReplied = ($totalComments === 0 || $repliedComments >= $totalComments);
     $highlight = ($approvalCount >= 2 && in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR CODING']))
-              || ($allReplied && $totalComments > 0 && !in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR TEST', 'READY FOR DEPLOY']));
+              || ($allReplied && $totalComments > 0 && !in_array(strtoupper($jiraStatus), ['READY FOR CODE REVIEW', 'READY FOR TEST', 'READY FOR DEPLOY', 'OPEN']));
 
     $rows[] = [
         'number'            => $number,
@@ -463,9 +463,9 @@ foreach ($jiraSearch['issues'] ?? [] as $issue) {
     ];
 }
 
-// Sort sprint tasks by priority (DONE and ABANDONED always at the bottom)
+// Sort sprint tasks by priority (DONE, ABANDONED, and IMPEDIMENT always at the bottom)
 $priorityOrder = ['Highest' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3, 'Lowest' => 4];
-$finishedStatuses = ['DONE', 'ABANDONED'];
+$finishedStatuses = ['DONE', 'ABANDONED', 'IMPEDIMENT'];
 usort($sprintTasks, function ($a, $b) use ($priorityOrder, $finishedStatuses) {
     $aDone = in_array(strtoupper($a['status']), $finishedStatuses) ? 1 : 0;
     $bDone = in_array(strtoupper($b['status']), $finishedStatuses) ? 1 : 0;
@@ -680,7 +680,7 @@ if (!empty($slackToken)) {
         </thead>
         <tbody>
             <?php foreach ($sprintTasks as $task): ?>
-            <?php $isFinished = in_array(strtoupper($task['status']), ['DONE', 'ABANDONED']); ?>
+            <?php $isFinished = in_array(strtoupper($task['status']), $finishedStatuses); ?>
             <tr>
                 <td><?= renderTicketCell($task['num'], $task['key'], $task['jira_parent'], $task['jira_child'], $jiraDomain, $task['jira_parent_status'], $task['jira_child_status']) ?></td>
                 <td<?= $isFinished ? ' class="title-muted"' : '' ?>><?= htmlspecialchars($task['title']) ?><?= priorityLabel($task['priority'], $task['story_points']) ?></td>

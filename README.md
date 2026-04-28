@@ -21,7 +21,7 @@ A table listing all your authored pull requests with:
 
 **Row highlighting:** Rows are highlighted in dark red when either condition is met:
 - **2+ approvals** and Jira status is still `READY FOR CODE REVIEW` or `READY FOR CODING` (Jira ticket needs updating)
-- **All PR comments replied** (at least one comment thread exists) and Jira status is not `READY FOR CODE REVIEW`, `READY FOR TEST`, or `READY FOR DEPLOY` (PR is ready to advance but Jira doesn't reflect it)
+- **All PR comments replied** (at least one comment thread exists) and Jira status is not `READY FOR CODE REVIEW`, `READY FOR TEST`, `READY FOR DEPLOY`, or `OPEN` (PR is ready to advance but Jira doesn't reflect it)
 
 **Filters:** Toggle checkboxes for "Show merged" and "Show closed" PRs. By default, only open PRs are displayed.
 
