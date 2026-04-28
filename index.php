@@ -133,7 +133,7 @@ function renderTicketCell(string $num, string $key, string $parent, string $chil
     if ($parent && $child) {
         return $parentLink . ' <span class="ticket-arrow">&#10132;</span> ' . $mainLink . ' <span class="ticket-arrow">&#10132;</span> ' . $childLink;
     } elseif ($parent) {
-        return $mainLink . ' <span class="ticket-arrow">&#10132;</span> ' . $parentLink;
+        return $parentLink . ' <span class="ticket-arrow">&#10132;</span> ' . $mainLink;
     } else {
         return $mainLink . ' <span class="ticket-arrow">&#10132;</span> ' . $childLink;
     }

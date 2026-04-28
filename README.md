@@ -14,7 +14,7 @@ A table listing all your authored pull requests with:
 | **PR Title** | Title with a red **C** badge if the PR has merge conflicts |
 | **Jira Ticket** | Extracted `ED-XXXX` number with parent/child ticket hierarchy (shown as arrows with tooltip statuses) |
 | **Jira Status** | Current Jira status badge; `WORKING ON` is highlighted with a warning background |
-| **Task cmnts** | Jira issue comments — replied/total (red if unreplied comments exist) |
+| **Task cmnts** | Jira issue comments — replied/total (red if unreplied comments exist). When the total is non-zero, a checkbox appears next to the count: tick it to mark the ticket as "handled". The checkbox auto-unchecks on the next page refresh if the total comment count has changed since last load (a new comment arrived). State is persisted in `temp-data.json` |
 | **PR cmnts** | GitHub review thread comments — resolved/total; green if all threads are replied to (even if not formally resolved by the reviewer), red if unreplied threads remain |
 | **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise; hover to see each reviewer's name and state; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned. Only definitive review states (`APPROVED`, `CHANGES_REQUESTED`, `DISMISSED`) are tracked — intermediate `COMMENTED` reviews do not overwrite a prior approval |
 | **PR Status** | Merged (purple), Open (green), or Closed (red) badge |
@@ -47,7 +47,7 @@ Jira tasks in the current sprint assigned to you that don't have a linked PR yet
 | **Jira Ticket** | Ticket number with parent/child hierarchy |
 | **Title** | Task summary |
 | **Jira Status** | Current status badge |
-| **Task cmnts** | Replied/total Jira comments |
+| **Task cmnts** | Replied/total Jira comments. Same checkbox behavior as the My PRs table — tick to mark "handled", auto-unchecks if the total changes |
 
 ### 4. Calendar Events
 
@@ -98,7 +98,8 @@ task-tracker/
   env.php            # Credentials (gitignored)
   env.sample.php     # Credential template
   cron-slack.tmp     # Sent message tracking (gitignored)
-  .gitignore         # Excludes env.php and *.tmp
+  temp-data.json     # Per-ticket Task-cmnts checkbox state (gitignored)
+  .gitignore         # Excludes env.php, *.tmp, and temp-data.json
 ```
 
 ## Setup
