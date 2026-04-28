@@ -13,7 +13,7 @@ A table listing all your authored pull requests with:
 | **PR No.** | Clickable link to the PR on GitHub |
 | **PR Title** | Title with a red **C** badge if the PR has merge conflicts |
 | **Jira Ticket** | Extracted `ED-XXXX` number with parent/child ticket hierarchy (shown as arrows with tooltip statuses) |
-| **Jira Status** | Current Jira status badge; `WORKING ON` is highlighted with a warning background |
+| **Jira Status** | Current Jira status badge; `WORKING ON` and `OPEN` are highlighted with a warning background |
 | **Task cmnts** | Jira issue comments — replied/total (red if unreplied comments exist). When the total is non-zero, a checkbox appears next to the count: tick it to mark the ticket as "handled". The checkbox auto-unchecks on the next page refresh if the total comment count has changed since last load (a new comment arrived). State is persisted in `temp-data.json` |
 | **PR cmnts** | GitHub review thread comments — resolved/total; green if all threads are replied to (even if not formally resolved by the reviewer), red if unreplied threads remain |
 | **Approvals** | Approval count vs total reviewers (e.g. `2/3`); green when >= 2 approvals, red otherwise; hover to see each reviewer's name and state; shows a re-request icon when a reviewer left "changes requested" but hasn't been re-assigned. Only definitive review states (`APPROVED`, `CHANGES_REQUESTED`, `DISMISSED`) are tracked — intermediate `COMMENTED` reviews do not overwrite a prior approval |

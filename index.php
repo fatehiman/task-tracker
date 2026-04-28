@@ -582,7 +582,7 @@ if (!empty($slackToken)) {
                 <td><a href="https://github.com/<?= htmlspecialchars($githubRepo) ?>/pull/<?= $row['number'] ?>" target="_blank">#<?= $row['number'] ?></a></td>
                 <td><?= htmlspecialchars($row['title']) ?><?= priorityLabel($row['jira_priority'], $row['jira_story_points']) ?><?php if ($row['has_conflict']): ?><span class="conflict-badge" title="Conflict">C</span><?php endif; ?></td>
                 <td><?= renderTicketCell($row['jira_num'], $row['jira_key'], $row['jira_parent'], $row['jira_child'], $jiraDomain, $row['jira_parent_status'], $row['jira_child_status']) ?></td>
-                <?php $jiraBadge = strtoupper($row['jira_status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
+                <?php $jiraBadge = in_array(strtoupper($row['jira_status']), ['WORKING ON', 'OPEN']) ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $jiraBadge ?>"><?= htmlspecialchars($row['jira_status']) ?></span></td>
                 <?php $jCmtClass = ($row['jira_cmts_total'] > $row['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
                 <td><span class="<?= $jCmtClass ?>"><?= $row['jira_cmts_replied'] ?>/<?= $row['jira_cmts_total'] ?></span><?php if ($row['jira_cmts_total'] > 0 && $row['jira_key']): ?> <input type="checkbox" class="cmt-check" data-key="<?= htmlspecialchars($row['jira_key']) ?>"<?= !empty($tempData[$row['jira_key']]['checked']) ? ' checked' : '' ?>><?php endif; ?></td>
