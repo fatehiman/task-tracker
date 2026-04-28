@@ -1,5 +1,23 @@
 <?php
 set_time_limit(180);
+
+$tempDataFile = __DIR__ . '/temp-data.json';
+
+// AJAX: persist checkbox toggle for a Jira ticket. Kept here so we exit
+// before the heavy API fetches below.
+if (($_POST['ajax_action'] ?? '') === 'toggle_comment_check') {
+    header('Content-Type: application/json');
+    $key = $_POST['key'] ?? '';
+    $checked = !empty($_POST['checked']) && $_POST['checked'] !== '0' && $_POST['checked'] !== 'false';
+    if ($key === '') { echo json_encode(['ok' => false, 'error' => 'missing key']); exit; }
+    $data = is_file($tempDataFile) ? (json_decode(file_get_contents($tempDataFile), true) ?: []) : [];
+    if (!isset($data[$key])) $data[$key] = ['total' => 0, 'checked' => false, 'created_at' => time()];
+    $data[$key]['checked'] = $checked;
+    file_put_contents($tempDataFile, json_encode($data, JSON_PRETTY_PRINT));
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/zoho.php';
 require_once __DIR__ . '/google.php';
@@ -458,6 +476,51 @@ usort($sprintTasks, function ($a, $b) use ($priorityOrder, $finishedStatuses) {
 });
 
 
+// Sync temp-data.json: auto-uncheck a ticket's checkbox if its total
+// comment count changed since last load (a new comment arrived). Only
+// keys present on this page (table 1 + table 3) are touched.
+$tempData = is_file($tempDataFile) ? (json_decode(file_get_contents($tempDataFile), true) ?: []) : [];
+$currentTotals = [];
+foreach ($rows as $row) {
+    if ($row['jira_key']) $currentTotals[$row['jira_key']] = (int) $row['jira_cmts_total'];
+}
+foreach ($sprintTasks as $task) {
+    $currentTotals[$task['key']] = (int) $task['jira_cmts_total'];
+}
+$tempDataDirty = false;
+$nowTs = time();
+$cutoffTs = $nowTs - 60 * 86400;
+
+// Drop entries older than 60 days (garbage collection).
+foreach (array_keys($tempData) as $key) {
+    $createdAt = (int) ($tempData[$key]['created_at'] ?? 0);
+    if ($createdAt > 0 && $createdAt < $cutoffTs) {
+        unset($tempData[$key]);
+        $tempDataDirty = true;
+    }
+}
+
+foreach ($currentTotals as $key => $total) {
+    if (!isset($tempData[$key])) {
+        $tempData[$key] = ['total' => $total, 'checked' => false, 'created_at' => $nowTs];
+        $tempDataDirty = true;
+        continue;
+    }
+    // Backfill missing created_at on pre-existing entries.
+    if (!isset($tempData[$key]['created_at'])) {
+        $tempData[$key]['created_at'] = $nowTs;
+        $tempDataDirty = true;
+    }
+    if ((int) $tempData[$key]['total'] !== $total) {
+        $tempData[$key]['total'] = $total;
+        $tempData[$key]['checked'] = false;
+        $tempDataDirty = true;
+    }
+}
+if ($tempDataDirty) {
+    file_put_contents($tempDataFile, json_encode($tempData, JSON_PRETTY_PRINT));
+}
+
 // Zoho Calendar events
 $zohoEvents = [];
 if (!empty($zohoClientId) && !empty($zohoRefreshToken) && !empty($zohoCalendarId)) {
@@ -522,7 +585,7 @@ if (!empty($slackToken)) {
                 <?php $jiraBadge = strtoupper($row['jira_status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $jiraBadge ?>"><?= htmlspecialchars($row['jira_status']) ?></span></td>
                 <?php $jCmtClass = ($row['jira_cmts_total'] > $row['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
-                <td><span class="<?= $jCmtClass ?>"><?= $row['jira_cmts_replied'] ?>/<?= $row['jira_cmts_total'] ?></span></td>
+                <td><span class="<?= $jCmtClass ?>"><?= $row['jira_cmts_replied'] ?>/<?= $row['jira_cmts_total'] ?></span><?php if ($row['jira_cmts_total'] > 0 && $row['jira_key']): ?> <input type="checkbox" class="cmt-check" data-key="<?= htmlspecialchars($row['jira_key']) ?>"<?= !empty($tempData[$row['jira_key']]['checked']) ? ' checked' : '' ?>><?php endif; ?></td>
                 <?php $cmtClass = $row['comments_all_replied'] ? 'comments-resolved' : 'comments-unresolved'; ?>
                 <td><span class="<?= $cmtClass ?>"><?= $row['comments_resolved'] ?>/<?= $row['comments_total'] ?></span></td>
                 <td>
@@ -624,7 +687,7 @@ if (!empty($slackToken)) {
                 <?php $taskBadge = strtoupper($task['status']) === 'WORKING ON' ? 'badge-jira-warn' : 'badge-jira'; ?>
                 <td><span class="badge <?= $taskBadge ?>"><?= htmlspecialchars($task['status']) ?></span></td>
                 <?php $tCmtClass = ($task['jira_cmts_total'] > $task['jira_cmts_replied']) ? 'comments-unresolved' : 'comments-resolved'; ?>
-                <td><span class="<?= $tCmtClass ?>"><?= $task['jira_cmts_replied'] ?>/<?= $task['jira_cmts_total'] ?></span></td>
+                <td><span class="<?= $tCmtClass ?>"><?= $task['jira_cmts_replied'] ?>/<?= $task['jira_cmts_total'] ?></span><?php if ($task['jira_cmts_total'] > 0): ?> <input type="checkbox" class="cmt-check" data-key="<?= htmlspecialchars($task['key']) ?>"<?= !empty($tempData[$task['key']]['checked']) ? ' checked' : '' ?>><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -674,5 +737,16 @@ if (!empty($slackToken)) {
 </div>
 <?php endif; ?>
 
+<script>
+document.querySelectorAll('.cmt-check').forEach(cb => {
+    cb.addEventListener('change', function () {
+        const fd = new FormData();
+        fd.append('ajax_action', 'toggle_comment_check');
+        fd.append('key', this.dataset.key);
+        fd.append('checked', this.checked ? '1' : '0');
+        fetch('', { method: 'POST', body: fd, credentials: 'same-origin' });
+    });
+});
+</script>
 </body>
 </html>
